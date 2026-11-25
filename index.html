@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0e1116">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Migraine Barometer</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#171c24; --panel2:#1e2530; --line:#2a3342;
+    --text:#e8ecf2; --dim:#8b97a8; --accent:#ff6b4a; --accent2:#ffb199;
+    --good:#5ec48a; --warn:#f2b84b; --bad:#ff5d5d;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none}
+  body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+  .wrap{max-width:520px;margin:0 auto;padding:16px 18px 40px}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  h1{font-size:18px;margin:0;font-weight:600;letter-spacing:.2px}
+  .tabs{display:flex;gap:6px}
+  .tab{background:none;border:1px solid var(--line);color:var(--dim);padding:6px 12px;border-radius:999px;font-size:14px}
+  .tab.on{background:var(--panel2);color:var(--text);border-color:#3a475c}
+
+  .pressure{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin:12px 0 18px}
+  .pressure .row{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .pnum{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums}
+  .pnum small{font-size:15px;color:var(--dim);font-weight:500;margin-left:4px}
+  .trend{font-size:14px;color:var(--dim);text-align:right}
+  .trend b{color:var(--text)}
+  .trend .falling{color:var(--warn)} .trend .rapid{color:var(--bad)} .trend .steady{color:var(--good)}
+  #spark{width:100%;height:54px;display:block;margin-top:8px}
+  .pstatus{font-size:12px;color:var(--dim);margin-top:6px}
+
+  #logbtn{display:block;width:100%;aspect-ratio:1/1;max-height:56vh;border:none;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#ff8a6b,#e0452a 70%);color:#fff;font-size:30px;font-weight:700;
+    box-shadow:0 14px 40px rgba(255,107,74,.28),inset 0 -8px 20px rgba(0,0,0,.18);
+    margin:6px auto 10px;max-width:300px;transition:transform .08s}
+  #logbtn:active{transform:scale(.96)}
+  #logbtn small{display:block;font-size:14px;font-weight:500;opacity:.85;margin-top:6px}
+  .hint{text-align:center;color:var(--dim);font-size:13px;margin:0 0 18px}
+
+  .last{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;font-size:14px;color:var(--dim)}
+  .last b{color:var(--text)}
+
+  /* sheet */
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-end;justify-content:center;z-index:10}
+  .scrim.on{display:flex}
+  .sheet{background:var(--panel);width:100%;max-width:520px;border-radius:22px 22px 0 0;padding:20px 18px calc(22px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line);animation:up .18s ease-out}
+  @keyframes up{from{transform:translateY(30px);opacity:.5}to{transform:none;opacity:1}}
+  .sheet h2{margin:0 0 4px;font-size:18px}
+  .sheet .sub{color:var(--dim);font-size:13px;margin-bottom:14px}
+  .scale{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+  .scale button{height:52px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:20px;font-weight:600}
+  .scale button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  textarea{width:100%;min-height:76px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;color:var(--text);
+    padding:10px 12px;font:inherit;resize:none;margin-bottom:12px}
+  .btns{display:flex;gap:10px}
+  .btn{flex:1;height:50px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:16px;font-weight:600}
+  .btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.del{flex:0 0 auto;padding:0 16px;color:var(--bad)}
+
+  /* history */
+  .hist{display:none}
+  .entry{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+  .entry .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .entry .when{font-weight:600;font-size:15px}
+  .pain{min-width:34px;text-align:center;padding:3px 9px;border-radius:999px;font-weight:700;font-size:14px;color:#10141a}
+  .entry .meta{color:var(--dim);font-size:13px;margin-top:4px}
+  .entry .note{margin-top:6px;font-size:14px}
+  .empty{color:var(--dim);text-align:center;padding:40px 10px}
+  .tools{display:flex;gap:10px;margin:4px 0 14px}
+  .tools .btn{height:42px;font-size:14px}
+  .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+  .stat .v{font-size:22px;font-weight:700}
+  .stat .l{font-size:12px;color:var(--dim)}
+  .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#263042;border:1px solid #3a475c;
+    padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
+  .toast.on{opacity:1}
+  .install{display:none;background:var(--panel2);border:1px dashed #3a475c;border-radius:12px;padding:10px 12px;font-size:13px;color:var(--dim);margin-bottom:12px}
+  .install button{margin-left:8px;background:var(--accent);border:none;color:#fff;border-radius:8px;padding:6px 10px;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Migraine Barometer</h1>
+    <div class="tabs">
+      <button class="tab on" id="tabLog">Log</button>
+      <button class="tab" id="tabHist">History</button>
+    </div>
+  </header>
+
+  <section id="viewLog">
+    <div class="install" id="install">Add to home screen for one-tap access.<button id="installBtn">Install</button></div>
+
+    <div class="pressure">
+      <div class="row">
+        <div class="pnum"><span id="pval">--</span><small>hPa</small></div>
+        <div class="trend" id="ptrend">Fetching pressure…</div>
+      </div>
+      <svg id="spark" viewBox="0 0 300 54" preserveAspectRatio="none"></svg>
+      <div class="pstatus" id="pstatus"></div>
+    </div>
+
+    <button id="logbtn">Log migraine<small>Tap now, add details after</small></button>
+    <p class="hint">Time and pressure are captured the instant you tap.</p>
+    <div class="last" id="last">No migraines logged yet.</div>
+  </section>
+
+  <section class="hist" id="viewHist">
+    <div class="summary" id="summary"></div>
+    <div class="tools">
+      <button class="btn" id="csvBtn">Export CSV</button>
+      <button class="btn" id="shareBtn">Share summary</button>
+    </div>
+    <div id="list"></div>
+  </section>
+</div>
+
+<div class="scrim" id="scrim">
+  <div class="sheet">
+    <h2>Logged <span id="shTime"></span></h2>
+    <div class="sub" id="shSub">How bad is it?</div>
+    <div class="scale" id="scale"></div>
+    <textarea id="note" placeholder="Optional: symptoms, triggers, medication, weather…"></textarea>
+    <div class="btns">
+      <button class="btn del" id="delBtn">Delete</button>
+      <button class="btn pri" id="saveBtn">Save</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const KEY = 'migraine.entries.v1', LOCKEY = 'migraine.loc.v1';
+
+  // ---------- storage ----------
+  const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
+  const save = a => { try { localStorage.setItem(KEY, JSON.stringify(a)); } catch {} };
+  let entries = load();
+
+  // ---------- helpers ----------
+  const fmtDate = t => new Date(t).toLocaleString('en-GB', { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  const fmtTime = t => new Date(t).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+  const painColour = n => n == null ? '#3a475c' : n <= 3 ? '#5ec48a' : n <= 6 ? '#f2b84b' : n <= 8 ? '#ff9a4a' : '#ff5d5d';
+  const toast = m => { const t = $('toast'); t.textContent = m; t.classList.add('on'); setTimeout(() => t.classList.remove('on'), 1800); };
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const vibrate = () => { try { navigator.vibrate && navigator.vibrate(30); } catch {} };
+
+  // ---------- pressure ----------
+  let cur = null; // {hpa, d3, d6, series[], t}
+  function getLoc() {
+    return new Promise(res => {
+      const cached = (() => { try { return JSON.parse(localStorage.getItem(LOCKEY)); } catch { return null; } })();
+      if (!navigator.geolocation) return res(cached);
+      navigator.geolocation.getCurrentPosition(
+        p => { const l = { lat: p.coords.latitude, lon: p.coords.longitude, t: Date.now() };
+               try { localStorage.setItem(LOCKEY, JSON.stringify(l)); } catch {} res(l); },
+        () => res(cached),
+        { enableHighAccuracy: false, timeout: 6000, maximumAge: 30 * 60 * 1000 }
+      );
+    });
+  }
+
+  async function fetchPressure() {
+    const loc = await getLoc();
+    if (!loc) { $('ptrend').textContent = 'Location needed'; $('pstatus').textContent = 'Allow location so I can look up local pressure.'; return null; }
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat.toFixed(3)}&longitude=${loc.lon.toFixed(3)}` +
+      `&hourly=pressure_msl&past_hours=24&forecast_hours=3&timezone=UTC`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('weather ' + r.status);
+    const j = await r.json();
+    const times = j.hourly.time.map(s => Date.parse(s + 'Z'));
+    const vals = j.hourly.pressure_msl;
+    const now = Date.now();
+    // interpolate current value
+    let i = times.findIndex(t => t > now); if (i < 1) i = Math.max(1, times.length - 1);
+    const f = (now - times[i-1]) / (times[i] - times[i-1]);
+    const at = tt => {
+      let k = times.findIndex(t => t > tt); if (k < 1) k = 1;
+      const g = (tt - times[k-1]) / (times[k] - times[k-1]);
+      return vals[k-1] + (vals[k] - vals[k-1]) * Math.min(1, Math.max(0, g));
+    };
+    const hpa = vals[i-1] + (vals[i] - vals[i-1]) * Math.min(1, Math.max(0, f));
+    const out = {
+      hpa: +hpa.toFixed(1),
+      d3: +(hpa - at(now - 3*3600e3)).toFixed(1),
+      d6: +(hpa - at(now - 6*3600e3)).toFixed(1),
+      series: times.map((t, k) => [t, vals[k]]),
+      t: now
+    };
+    return out;
+  }
+
+  function trendLabel(d3) {
+    const a = Math.abs(d3);
+    if (a < 0.8) return ['Steady', 'steady'];
+    const dir = d3 < 0 ? 'Falling' : 'Rising';
+    return [a >= 3 ? dir + ' fast' : dir, a >= 3 ? 'rapid' : 'falling'];
+  }
+
+  function renderPressure() {
+    if (!cur) return;
+    $('pval').textContent = cur.hpa.toFixed(1);
+    const [lbl, cls] = trendLabel(cur.d3);
+    const sgn = n => (n > 0 ? '+' : '') + n.toFixed(1);
+    $('ptrend').innerHTML = `<b class="${cls}">${lbl}</b><br>${sgn(cur.d3)} / 3h · ${sgn(cur.d6)} / 6h`;
+    $('pstatus').textContent = 'Updated ' + fmtTime(cur.t) + ' · sea-level pressure from Open-Meteo';
+    drawSpark();
+  }
+
+  function drawSpark() {
+    const svg = $('spark'); if (!cur) return;
+    const s = cur.series, W = 300, H = 54, pad = 4;
+    const t0 = s[0][0], t1 = s[s.length-1][0];
+    const vs = s.map(p => p[1]); const lo = Math.min(...vs) - .5, hi = Math.max(...vs) + .5;
+    const x = t => (t - t0) / (t1 - t0) * W;
+    const y = v => H - pad - (v - lo) / (hi - lo) * (H - pad * 2);
+    const d = s.map((p, i) => (i ? 'L' : 'M') + x(p[0]).toFixed(1) + ' ' + y(p[1]).toFixed(1)).join('');
+    let marks = '';
+    entries.forEach(e => { if (e.t >= t0 && e.t <= t1) marks += `<line x1="${x(e.t)}" x2="${x(e.t)}" y1="0" y2="${H}" stroke="#ff6b4a" stroke-width="1.5" stroke-dasharray="3 3"/>`; });
+    const nx = x(cur.t);
+    svg.innerHTML = `<path d="${d}" fill="none" stroke="#8fb4ff" stroke-width="2" vector-effect="non-scaling-stroke"/>` + marks +
+      `<circle cx="${nx}" cy="${y(cur.hpa)}" r="3.5" fill="#fff"/>`;
+  }
+
+  async function refreshPressure() {
+    try {
+      const p = await fetchPressure();
+      if (p) { cur = p; try { localStorage.setItem('migraine.lastP', JSON.stringify(p)); } catch {} renderPressure(); backfill(); }
+    } catch (e) {
+      if (!cur) { try { cur = JSON.parse(localStorage.getItem('migraine.lastP')); } catch {} }
+      if (cur) { renderPressure(); $('pstatus').textContent = 'Offline · showing reading from ' + fmtTime(cur.t); }
+      else { $('ptrend').textContent = 'Offline'; $('pstatus').textContent = 'Logs still save; pressure fills in when you are back online.'; }
+    }
+  }
+
+  // fill pressure for entries logged while offline / lookup failed (only possible within last 24h)
+  function backfill() {
+    if (!cur) return;
+    let changed = false;
+    entries.forEach(e => {
+      if (e.hpa == null && e.t >= cur.series[0][0]) {
+        const s = cur.series, at = tt => { let k = s.findIndex(p => p[0] > tt); if (k < 1) k = 1;
+          const g = (tt - s[k-1][0]) / (s[k][0] - s[k-1][0]); return s[k-1][1] + (s[k][1] - s[k-1][1]) * Math.min(1, Math.max(0, g)); };
+        const h = at(e.t); e.hpa = +h.toFixed(1); e.d3 = +(h - at(e.t - 3*3600e3)).toFixed(1); e.d6 = +(h - at(e.t - 6*3600e3)).toFixed(1); changed = true;
+      }
+    });
+    if (changed) { save(entries); renderAll(); }
+  }
+
+  // ---------- logging ----------
+  let editing = null, pain = null;
+  function buildScale() {
+    $('scale').innerHTML = '';
+    for (let i = 1; i <= 10; i++) {
+      const b = document.createElement('button'); b.textContent = i;
+      b.onclick = () => { pain = i; [...$('scale').children].forEach(c => c.classList.toggle('on', +c.textContent === i)); };
+      $('scale').appendChild(b);
+    }
+  }
+  function openSheet(e, isNew) {
+    editing = e; pain = e.pain || null;
+    $('shTime').textContent = fmtDate(e.t);
+    $('shSub').textContent = e.hpa != null ? `${e.hpa} hPa · ${e.d3 > 0 ? '+' : ''}${e.d3} over 3h` : 'Pressure will fill in shortly';
+    $('note').value = e.note || '';
+    [...$('scale').children].forEach(c => c.classList.toggle('on', +c.textContent === pain));
+    $('delBtn').style.display = isNew ? 'none' : '';
+    $('scrim').classList.add('on');
+  }
+  function closeSheet() { $('scrim').classList.remove('on'); editing = null; }
+
+  function quickLog() {
+    vibrate();
+    const e = { id: Date.now().toString(36), t: Date.now(), hpa: null, d3: null, d6: null, pain: null, note: '' };
+    if (cur && Date.now() - cur.t < 90 * 60 * 1000) { e.hpa = cur.hpa; e.d3 = cur.d3; e.d6 = cur.d6; }
+    entries.unshift(e); save(entries); renderAll();
+    openSheet(e, true);
+    if (e.hpa == null) refreshPressure().then(() => { const x = entries.find(z => z.id === e.id); if (x && x.hpa != null && editing && editing.id === x.id) $('shSub').textContent = `${x.hpa} hPa · ${x.d3 > 0 ? '+' : ''}${x.d3} over 3h`; });
+  }
+
+  $('logbtn').onclick = quickLog;
+  $('saveBtn').onclick = () => {
+    if (!editing) return;
+    editing.pain = pain; editing.note = $('note').value.trim();
+    const e = entries.find(z => z.id === editing.id); if (e) { e.pain = editing.pain; e.note = editing.note; }
+    save(entries); renderAll(); closeSheet(); toast('Saved');
+  };
+  $('delBtn').onclick = () => {
+    if (!editing) return;
+    if (!confirm('Delete this entry?')) return;
+    entries = entries.filter(z => z.id !== editing.id); save(entries); renderAll(); closeSheet();
+  };
+  $('scrim').onclick = ev => { if (ev.target === $('scrim')) { closeSheet(); toast('Logged (no details)'); } };
+
+  // ---------- render ----------
+  function renderAll() {
+    const l = entries[0];
+    $('last').innerHTML = l ? `Last: <b>${fmtDate(l.t)}</b>${l.pain ? ' · pain <b>' + l.pain + '/10</b>' : ''}${l.hpa != null ? ' · ' + l.hpa + ' hPa' : ''}` : 'No migraines logged yet.';
+    // summary
+    const now = Date.now(), d30 = entries.filter(e => e.t > now - 30*864e5);
+    const withP = entries.filter(e => e.pain);
+    const avg = withP.length ? (withP.reduce((a, e) => a + e.pain, 0) / withP.length).toFixed(1) : '–';
+    const drops = entries.filter(e => e.d3 != null && e.d3 <= -1.5).length;
+    const known = entries.filter(e => e.d3 != null).length;
+    $('summary').innerHTML =
+      `<div class="stat"><div class="v">${d30.length}</div><div class="l">last 30 days</div></div>` +
+      `<div class="stat"><div class="v">${avg}</div><div class="l">avg pain</div></div>` +
+      `<div class="stat"><div class="v">${known ? Math.round(drops / known * 100) + '%' : '–'}</div><div class="l">after a pressure drop</div></div>`;
+    // list
+    $('list').innerHTML = entries.length ? '' : '<div class="empty">Nothing logged yet.</div>';
+    entries.forEach(e => {
+      const d = document.createElement('div'); d.className = 'entry';
+      d.innerHTML = `<div class="top"><div class="when">${fmtDate(e.t)}</div><div class="pain" style="background:${painColour(e.pain)}">${e.pain ?? '–'}</div></div>` +
+        `<div class="meta">${e.hpa != null ? e.hpa + ' hPa · ' + (e.d3 > 0 ? '+' : '') + e.d3 + ' /3h · ' + (e.d6 > 0 ? '+' : '') + e.d6 + ' /6h' : 'No pressure data'}</div>` +
+        (e.note ? `<div class="note">${esc(e.note)}</div>` : '');
+      d.onclick = () => openSheet(e, false);
+      $('list').appendChild(d);
+    });
+    drawSpark();
+  }
+
+  // ---------- export ----------
+  function csv() {
+    const rows = [['date_time_local', 'pain_1_10', 'pressure_hPa', 'change_3h_hPa', 'change_6h_hPa', 'note']];
+    entries.slice().reverse().forEach(e => rows.push([new Date(e.t).toLocaleString('en-GB'), e.pain ?? '', e.hpa ?? '', e.d3 ?? '', e.d6 ?? '', '"' + (e.note || '').replace(/"/g, '""') + '"']));
+    return rows.map(r => r.join(',')).join('\n');
+  }
+  $('csvBtn').onclick = () => {
+    if (!entries.length) return toast('Nothing to export');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv()], { type: 'text/csv' }));
+    a.download = 'migraine-log-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  $('shareBtn').onclick = async () => {
+    if (!entries.length) return toast('Nothing to share');
+    const p = entries.filter(e => e.pain);
+    const text = `Migraine log summary\nEntries: ${entries.length}\nAverage pain: ${p.length ? (p.reduce((a, e) => a + e.pain, 0) / p.length).toFixed(1) : 'n/a'}/10\n\n` +
+      entries.slice(0, 20).map(e => `${fmtDate(e.t)} | pain ${e.pain ?? '-'} | ${e.hpa ?? '-'} hPa (${e.d3 ?? '-'} /3h)${e.note ? ' | ' + e.note : ''}`).join('\n');
+    try { if (navigator.share) await navigator.share({ title: 'Migraine log', text }); else { await navigator.clipboard.writeText(text); toast('Copied'); } } catch {}
+  };
+
+  // ---------- tabs ----------
+  function show(v) {
+    $('viewLog').style.display = v === 'log' ? '' : 'none';
+    $('viewHist').style.display = v === 'hist' ? 'block' : 'none';
+    $('tabLog').classList.toggle('on', v === 'log'); $('tabHist').classList.toggle('on', v === 'hist');
+  }
+  $('tabLog').onclick = () => show('log'); $('tabHist').onclick = () => show('hist');
+
+  // ---------- install ----------
+  let deferred = null;
+  addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; if (!matchMedia('(display-mode: standalone)').matches) $('install').style.display = 'block'; });
+  $('installBtn').onclick = async () => { if (!deferred) return; deferred.prompt(); await deferred.userChoice; deferred = null; $('install').style.display = 'none'; };
+  addEventListener('appinstalled', () => { $('install').style.display = 'none'; });
+
+  // ---------- boot ----------
+  buildScale(); renderAll(); show('log');
+  try { cur = JSON.parse(localStorage.getItem('migraine.lastP')); if (cur) renderPressure(); } catch {}
+  refreshPressure();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && (!cur || Date.now() - cur.t > 15 * 60 * 1000)) refreshPressure(); });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (new URLSearchParams(location.search).get('log') === '1') { history.replaceState(null, '', location.pathname); quickLog(); }
+})();
+</script>
+</body>
+</html>
